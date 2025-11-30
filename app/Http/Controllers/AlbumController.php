@@ -3,95 +3,135 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use App\Models\Album;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
+use App\Models\Album;
+use App\Models\Artist;
+use App\Models\Genre;
 
 class AlbumController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
+    /** ---------------- API (Mobile) ---------------- **/
+
     public function index()
     {
-        $albums = Album::with(['genre', 'songs'])->get();
+        // Show all albums sorted by release date (newest first)
+        $albums = \App\Models\Album::with(['artist', 'genre'])
+        ->orderBy('release_date', 'desc')
+        ->get();
+
         return response()->json($albums);
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
-    public function store(Request $request)
+
+    public function show($id)
     {
+        $album = \App\Models\Album::with(['artist', 'genre', 'songs'])->find($id);
+
+        if (!$album) {
+            return response()->json(['message' => 'Album not found'], 404);
+        }
+
+        return response()->json($album, 200);
+    }
+
+
+    /** ---------------- Web (Admin CRUD) ---------------- **/
+
+    public function webIndex()
+    {
+        $albums = Album::with(['artist', 'genre'])->get();
+        return view('admin.albums.index', compact('albums'));
+    }
+
+    public function webCreate()
+    {
+        $artists = Artist::all();
+        $genres = Genre::all();
+        return view('admin.albums.create', compact('artists', 'genres'));
+    }
+
+    public function webStore(Request $request)
+    {
+        $this->authorizeAdmin();
+
         $data = $request->validate([
+            'album_name' => 'required|string|max:100',
             'artist_id' => 'required|integer|exists:artists,artist_id',
-            'album_name' => 'required|string|max:255',
-            'album_cover' => 'nullable|string',
-            'duration' => 'nullable|integer',
-            'release_date' => 'nullable|date',
-            'genre_id' => 'required|integer|exists:genres,genre_id'
+            'genre_id' => 'required|integer|exists:genres,genre_id',
+            'release_date' => 'required|date',
+            'duration' => 'nullable',
+            'album_cover' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
         ]);
 
-        $album = Album::create([
-            'user_id' => Auth::id(),
-            ...$data,
-            'avg_rating' => 0
-        ]);
-
-        return response()->json([
-            'message' => 'Album created successfully',
-            'album' => $album
-        ], 201);
-    }
-    
-
-    /**
-     * Display the specified resource.
-     */
-    public function show(string $id)
-    {
-       $album = Album::with(['artists', 'songs', 'genre', 'reviews'])->find($id);
-
-        if (!$album) {
-            return response()->json(['message' => 'Album not found'], 404);
+        if ($request->hasFile('album_cover')) {
+            $data['album_cover'] = $request->file('album_cover')->store('albums', 'public');
         }
 
-        return response()->json($album); 
+        Album::create($data);
+
+        return redirect()->route('admin.albums')->with('success', 'Album created successfully.');
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, string $id)
+    public function webEdit($id)
     {
-        $album = Album::find($id);
+        $this->authorizeAdmin();
 
-        if (!$album) {
-            return response()->json(['message' => 'Album not found'], 404);
+        $album = Album::findOrFail($id);
+        $artists = Artist::all();
+        $genres = Genre::all();
+
+        return view('admin.albums.edit', compact('album', 'artists', 'genres'));
+    }
+
+    public function webUpdate(Request $request, $id)
+    {
+        $this->authorizeAdmin();
+
+        $album = Album::findOrFail($id);
+
+        $data = $request->validate([
+            'album_name' => 'required|string|max:100',
+            'artist_id' => 'required|integer|exists:artists,artist_id',
+            'genre_id' => 'required|integer|exists:genres,genre_id',
+            'release_date' => 'required|date',
+            'duration' => 'nullable',
+            'album_cover' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
+        ]);
+
+        if ($request->hasFile('album_cover')) {
+            if ($album->album_cover && Storage::disk('public')->exists($album->album_cover)) {
+                Storage::disk('public')->delete($album->album_cover);
+            }
+            $data['album_cover'] = $request->file('album_cover')->store('albums', 'public');
         }
 
-        $album->update($request->only([
-            'album_name', 'album_cover', 'duration', 'release_date', 'genre_id'
-        ]));
+        $album->update($data);
 
-        return response()->json([
-            'message' => 'Album updated successfully',
-            'album' => $album
-        ]);
+        return redirect()->route('admin.albums')->with('success', 'Album updated successfully.');
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(string $id)
+    public function webDestroy($id)
     {
-        $album = Album::find($id);
+        $this->authorizeAdmin();
 
-        if (!$album) {
-            return response()->json(['message' => 'Album not found'], 404);
+        $album = Album::findOrFail($id);
+
+        if ($album->album_cover && Storage::disk('public')->exists($album->album_cover)) {
+            Storage::disk('public')->delete($album->album_cover);
         }
 
         $album->delete();
 
-        return response()->json(['message' => 'Album deleted successfully']);
+        return redirect()->route('admin.albums')->with('success', 'Album deleted successfully.');
+    }
+
+    /** ---------------- Helper ---------------- **/
+
+    private function authorizeAdmin()
+    {
+        if (!auth()->check() || auth()->user()->role_id !== 1) {
+            abort(403, 'Unauthorized.');
+        }
     }
 }
