@@ -2,8 +2,10 @@
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\DB;
 use App\Http\Controllers\{
-    AuthController, PlaylistController, ReviewController, AlbumController, ArtistController, SongController
+    AuthController, PlaylistController, ReviewController, AlbumController, ArtistController, SongController,
+    GenreController, UserController, SearchController
 };
 
 Route::get('/user', function (Request $request) {
@@ -40,6 +42,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/playlists/{id}', [PlaylistController::class, 'destroy']);
     Route::post('/playlists/{id}/add-song', [PlaylistController::class, 'addSong']);
     Route::delete('/playlists/{id}/remove-song/{songId}', [PlaylistController::class, 'removeSong']);
+    Route::get('/playlists/{id}/songs', [PlaylistController::class, 'getSongs']);
 
+    Route::get('/users/{id}/profile', [UserController::class, 'getProfile']);
+    Route::delete('/user/delete', [UserController::class, 'deleteAccount']);
+    Route::get('/search',[SearchController::class, 'search']);
 
+    Route::get('/artists', [ArtistController::class, 'index']);
+    Route::get('/artists/{id}', [ArtistController::class, 'show']);
 });

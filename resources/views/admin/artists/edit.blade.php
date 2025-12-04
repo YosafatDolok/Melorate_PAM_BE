@@ -13,7 +13,7 @@
     </div>
 @endif
 
-<form action="{{ route('admin.artists.update', ['id' => $artist->id]) }}" method="POST" enctype="multipart/form-data">
+<form action="{{ route('admin.artists.update', ['id' => $artist->artist_id]) }}" method="POST" enctype="multipart/form-data">
     @csrf
     @method('PUT')
 

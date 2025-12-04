@@ -19,4 +19,9 @@ class Artist extends Model
     public function songs() {
         return $this->hasManyThrough(Song::class, Album::class, 'artist_id', 'album_id');
     }
+
+    public function genre()
+    {
+        return $this->belongsTo(Genre::class, 'genre_id', 'genre_id');
+    }
 }

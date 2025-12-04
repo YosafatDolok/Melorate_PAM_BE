@@ -114,4 +114,19 @@ class PlaylistController extends Controller
 
         return response()->json(['message' => 'Song removed from playlist']);
     }
+
+    public function getSongs($id)
+    {
+        $playlist = \App\Models\Playlist::with(['songs.artist', 'songs.genre'])
+        ->find($id);
+
+        if (!$playlist) {
+            return response()->json(['message' => 'Playlist not found'], 404);
+        }
+
+        return response()->json($playlist->songs);
+    }
+
 }
+
+
